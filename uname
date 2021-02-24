@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Change the kernel release you attempt to present here. For example,
-# FAKE_KERNEL_RELEASE="4.15.0-112-generic"
-FAKE_KERNEL_RELEASE=`/bin/uname -r`
+# Set the kernel release string you attempt to present here.
+# FAKE_KERNEL_RELEASE=
 
 # Reset in case getopts has been used previously in the shell.
 OPTIND=1
