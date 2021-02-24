@@ -19,18 +19,26 @@
 # Reset in case getopts has been used previously in the shell.
 OPTIND=1
 
-if [ $# -eq 0 ]; then
-	/bin/uname
-else
-	while getopts "asnrvmpio" opt; do
-		case "$opt" in
-			r)
-				echo ${FAKE_KERNEL_RELEASE}
-				;;
-			*)
-				/bin/uname -$opt
-				;;
-		esac
-	done
-fi
+# Obtain original output
+OUTPUT=`/bin/uname $@`
+
+# Substitute kernel release string
+function sub_kerenl_release() {
+    if [[ ! -z ${FAKE_KERNEL_RELEASE+x} ]]; then
+        ORG_KERNEL_RELEASE=`/bin/uname -r`
+        OUTPUT=${OUTPUT/${ORG_KERNEL_RELEASE}/${FAKE_KERNEL_RELEASE}}
+    fi
+}
+
+# Substitute strings in output if options is specified
+while getopts "asnrvmpio" opt; do
+    case "${opt}" in
+        a)
+            sub_kerenl_release;;
+        r)
+            sub_kerenl_release;;
+    esac
+done
+
+echo ${OUTPUT}
 
