@@ -5,7 +5,7 @@ A script that overrides the kernel release string output by `uname` command insi
 
 When compiling libs/apps, which refer kernel header in their source code, the configure script first invokes `uname -r` command to obtain kernel release string, and uses that string to generate path to kernel header.
 However, when compiling inside a container (like docker or singularity), the output of `uname -r` changes with host's kernel version because `uname -r` gets kernel release string from `uname()` system call and containers share the same kernel with their host. 
-If host kernel is updated but the kernel header inside containers is not updated at the same time. compiling these libs/apps results in errors due to kernel header not found.
+If host kernel is updated but the kernel header inside containers is not updated at the same time, compiling these libs/apps gets errors due to kernel header not found.
 Hence, we need to find a way to cheat the configure script.
 
 ## Usage
@@ -20,6 +20,7 @@ $ cp uname ~/.local/fakeuname/uname
 2. Set the `FAKE_KERNEL_RELEASE` macro in the `uname` script to the version of kernel header installed in the container.
 For example,
 ```bash
+# vim ~/.local/fakeuname/uname
 $ FAKE_KERNEL_RELEASE="4.15.0-112-generic"
 ```
 3. Include the fakeuname folder in your `PATH` env when running a container.
