@@ -37,6 +37,8 @@ while getopts "asnrvmpio" opt; do
             sub_kerenl_release;;
         r)
             sub_kerenl_release;;
+        *)
+            ;;
     esac
 done
 
