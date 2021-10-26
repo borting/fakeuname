@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Copyright 2021 Borting Chen <bortingchen@gmail.com>
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Search default path to uname binary
+UNAME_PATH=`type -p uname`
+UNAME_PATH_REAL=${UNAME_PATH}.real
+
+# List available kernel headers and read the results line by line into array ${lines [@]}
+IFS=$'\n' read -d '' -ra lines < <(ls /lib/modules/)
+
+# Prompt message to select one version from the existing kernel headers
+echo "Please select a drive:"
+select FAKE_KERNEL_HEADER in "${lines[@]}"; do
+    [[ -n $FAKE_KERNEL_HEADER ]] || { echo "Invalid choice. Please try again." >&2; continue; }
+    break # valid choice was made; exit
+done
+
+# Backup original uname binary for later use
+if [[ ! -f "$UNAME_PATH_REAL" ]]; then
+    mv ${UNAME_PATH} ${UNAME_PATH_REAL}
+fi
+rm -f ${UNAME_PATH}
+
+# Create a uname script with faked kernel release info
+cat <<EOF >> ${UNAME_PATH}
+#!/usr/bin/env bash
+FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}
+
+# Reset in case getopts has been used previously in the shell.
+OPTIND=1
+
+# Obtain original output
+OUTPUT=\`/bin/uname.real \$@\`
+
+# Substitute kernel release string
+function sub_kerenl_release() {
+    if [[ ! -z \${FAKE_KERNEL_RELEASE} ]]; then
+        ORG_KERNEL_RELEASE=\`/bin/uname.real -r\`
+        OUTPUT=\${OUTPUT/\${ORG_KERNEL_RELEASE}/\${FAKE_KERNEL_RELEASE}}
+    fi
+}
+
+# Substitute strings in output if options is specified
+while getopts "asnrvmpio" opt; do
+    case "\${opt}" in
+        a)
+            sub_kerenl_release;;
+        r)
+            sub_kerenl_release;;
+        *)
+            ;;
+    esac
+done
+
+echo \${OUTPUT}
+EOF
+chmod 755 ${UNAME_PATH}
+
+# Echo success
+echo 'Success! uname will return faked kernel release: '${FAKE_KERNEL_HEADER}
