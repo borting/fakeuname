@@ -17,56 +17,65 @@
 UNAME_PATH=`type -p uname`
 UNAME_PATH_REAL=${UNAME_PATH}.real
 
-# List available kernel headers and read the results line by line into array ${lines [@]}
-IFS=$'\n' read -d '' -ra lines < <(ls /lib/modules/)
-
 # Prompt message to select one version from the existing kernel headers
-echo "Please select a drive:"
-select FAKE_KERNEL_HEADER in "${lines[@]}"; do
-    [[ -n $FAKE_KERNEL_HEADER ]] || { echo "Invalid choice. Please try again." >&2; continue; }
-    break # valid choice was made; exit
-done
+function select_kernel_ver()
+{
+    # List available kernel headers and read the results line by line into array ${lines [@]}
+    IFS=$'\n' read -d '' -ra lines < <(ls /lib/modules/)
 
-# Backup original uname binary for later use
-if [[ ! -f "$UNAME_PATH_REAL" ]]; then
-    mv ${UNAME_PATH} ${UNAME_PATH_REAL}
-fi
-rm -f ${UNAME_PATH}
+    echo "Select version of kernel header to fake:"
+    select FAKE_KERNEL_HEADER in "${lines[@]}"; do
+        [[ -n $FAKE_KERNEL_HEADER ]] || { echo "Invalid choice. Please try again." >&2; continue; }
+        break # valid choice was made; exit
+    done
 
-# Create a uname script with faked kernel release info
-cat <<EOF >> ${UNAME_PATH}
-#!/usr/bin/env bash
-FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}
-
-# Reset in case getopts has been used previously in the shell.
-OPTIND=1
-
-# Obtain original output
-OUTPUT=\`/bin/uname.real \$@\`
-
-# Substitute kernel release string
-function sub_kerenl_release() {
-    if [[ ! -z \${FAKE_KERNEL_RELEASE} ]]; then
-        ORG_KERNEL_RELEASE=\`/bin/uname.real -r\`
-        OUTPUT=\${OUTPUT/\${ORG_KERNEL_RELEASE}/\${FAKE_KERNEL_RELEASE}}
+    # Backup original uname binary for later use
+    if [[ ! -f "$UNAME_PATH_REAL" ]]; then
+        mv ${UNAME_PATH} ${UNAME_PATH_REAL}
     fi
+    rm -f ${UNAME_PATH}
+
+    # Create a uname script with faked kernel release info
+    readarray message <<'    EOF'
+    #!/usr/bin/env bash
+    FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}
+
+    # Reset in case getopts has been used previously in the shell.
+    OPTIND=1
+
+    # Obtain original output
+    OUTPUT=`/bin/uname.real $@`
+
+    # Substitute kernel release string
+    function sub_kerenl_release() {
+        if [[ ! -z \${FAKE_KERNEL_RELEASE} ]]; then
+            ORG_KERNEL_RELEASE=`/bin/uname.real -r`
+            OUTPUT=${OUTPUT/${ORG_KERNEL_RELEASE}/${FAKE_KERNEL_RELEASE}}
+        fi
+    }
+
+    # Substitute strings in output if options is specified
+    while getopts "asnrvmpio" opt; do
+        case "${opt}" in
+            a)
+                sub_kerenl_release;;
+            r)
+                sub_kerenl_release;;
+            *)
+                ;;
+        esac
+    done
+
+    echo ${OUTPUT}
+    EOF
+
+    # Print the script to file and add executable permission
+    message[1]="    FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}"
+    printf '%s' "${message[@]}" >> ${UNAME_PATH}
+    chmod 755 ${UNAME_PATH}
+
+    # Echo success
+    echo 'Success! uname will return faked kernel release: '${FAKE_KERNEL_HEADER}
 }
 
-# Substitute strings in output if options is specified
-while getopts "asnrvmpio" opt; do
-    case "\${opt}" in
-        a)
-            sub_kerenl_release;;
-        r)
-            sub_kerenl_release;;
-        *)
-            ;;
-    esac
-done
-
-echo \${OUTPUT}
-EOF
-chmod 755 ${UNAME_PATH}
-
-# Echo success
-echo 'Success! uname will return faked kernel release: '${FAKE_KERNEL_HEADER}
+select_kernel_ver
