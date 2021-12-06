@@ -78,4 +78,32 @@ function select_kernel_ver()
     echo 'Success! uname will return faked kernel release: '${FAKE_KERNEL_HEADER}
 }
 
-select_kernel_ver
+# Use default uname binary
+function reset_uname()
+{
+    if [[ -f "$UNAME_PATH_REAL" ]]; then
+        mv ${UNAME_PATH_REAL} ${UNAME_PATH}
+    fi
+
+    echo 'Use original uname binary.'
+}
+
+# Reset in case getopts has been used previously in the shell.
+OPTIND=1
+
+while getopts "sr" opt; do
+    case "${opt}" in
+        s)
+            select_kernel_ver
+            exit 0
+            ;;
+        r)
+            reset_uname
+            exit 0
+            ;;
+        *)
+            select_kernel_ver
+            exit 0
+            ;;
+    esac
+done
