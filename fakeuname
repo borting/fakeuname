@@ -17,18 +17,9 @@
 UNAME_PATH=`type -p uname`
 UNAME_PATH_REAL=${UNAME_PATH}.real
 
-# Prompt message to select one version from the existing kernel headers
-function select_kernel_ver()
+# Create a fake uname script to intercept uname command and replace kernel version
+function create_fake_uname_script()
 {
-    # List available kernel headers and read the results line by line into array ${lines [@]}
-    IFS=$'\n' read -d '' -ra lines < <(ls /lib/modules/)
-
-    echo "Select version of kernel header to fake:"
-    select FAKE_KERNEL_HEADER in "${lines[@]}"; do
-        [[ -n $FAKE_KERNEL_HEADER ]] || { echo "Invalid choice. Please try again." >&2; continue; }
-        break # valid choice was made; exit
-    done
-
     # Backup original uname binary for later use
     if [[ ! -f "$UNAME_PATH_REAL" ]]; then
         mv ${UNAME_PATH} ${UNAME_PATH_REAL}
@@ -38,7 +29,7 @@ function select_kernel_ver()
     # Create a uname script with faked kernel release info
     readarray message <<'    EOF'
     #!/usr/bin/env bash
-    FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}
+    FAKE_KERNEL_RELEASE=${1}
 
     # Reset in case getopts has been used previously in the shell.
     OPTIND=1
@@ -70,12 +61,27 @@ function select_kernel_ver()
     EOF
 
     # Print the script to file and add executable permission
-    message[1]="    FAKE_KERNEL_RELEASE=${FAKE_KERNEL_HEADER}"
+    message[1]="    FAKE_KERNEL_RELEASE=${1}"
     printf '%s' "${message[@]}" >> ${UNAME_PATH}
     chmod 755 ${UNAME_PATH}
 
     # Echo success
-    echo 'Success! uname will return faked kernel release: '${FAKE_KERNEL_HEADER}
+    echo 'Success! uname will return faked kernel release: '${1}
+}
+
+# Prompt message to select one version from the existing kernel headers
+function select_kernel_ver()
+{
+    # List available kernel headers and read the results line by line into array ${lines [@]}
+    IFS=$'\n' read -d '' -ra lines < <(ls /lib/modules/)
+
+    echo "Select version of kernel header to fake:"
+    select FAKE_KERNEL_HEADER in "${lines[@]}"; do
+        [[ -n $FAKE_KERNEL_HEADER ]] || { echo "Invalid choice. Please try again." >&2; continue; }
+        break # valid choice was made; exit
+    done
+
+    create_fake_uname_script ${FAKE_KERNEL_HEADER}
 }
 
 # Use default uname binary
@@ -88,11 +94,26 @@ function reset_uname()
     echo 'Use original uname binary.'
 }
 
+# Change uname output to designated version of kernel header
+function change_kernel_ver()
+{
+    if [[ ! -d "/lib/modules/$1" ]]; then
+        echo "/lib/modules/$1 does not exist"
+		return
+    fi 
+
+    create_fake_uname_script ${1}
+}
+
 # Reset in case getopts has been used previously in the shell.
 OPTIND=1
 
-while getopts "sr" opt; do
+while getopts "src:" opt; do
     case "${opt}" in
+        c)
+            change_kernel_ver $OPTARG
+            exit 0
+            ;;
         s)
             select_kernel_ver
             exit 0
