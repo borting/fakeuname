@@ -15,16 +15,13 @@
 
 # Search default path to uname binary
 UNAME_PATH=`type -p uname`
-UNAME_PATH_REAL=${UNAME_PATH}.real
+UNAME_PATH_FAKE=${HOME}/.local/fakeuname/uname
 
 # Create a fake uname script to intercept uname command and replace kernel version
 function create_fake_uname_script()
 {
-    # Backup original uname binary for later use
-    if [[ ! -f "$UNAME_PATH_REAL" ]]; then
-        mv ${UNAME_PATH} ${UNAME_PATH_REAL}
-    fi
-    rm -f ${UNAME_PATH}
+    # Delete fake script
+    rm -rf ${UNAME_PATH_FAKE}
 
     # Create a uname script with faked kernel release info
     readarray message <<'    EOF'
@@ -35,12 +32,12 @@ function create_fake_uname_script()
     OPTIND=1
 
     # Obtain original output
-    OUTPUT=`/bin/uname.real $@`
+    OUTPUT=`/bin/uname $@`
 
     # Substitute kernel release string
     function sub_kerenl_release() {
         if [[ ! -z \${FAKE_KERNEL_RELEASE} ]]; then
-            ORG_KERNEL_RELEASE=`/bin/uname.real -r`
+            ORG_KERNEL_RELEASE=`/bin/uname -r`
             OUTPUT=${OUTPUT/${ORG_KERNEL_RELEASE}/${FAKE_KERNEL_RELEASE}}
         fi
     }
@@ -62,11 +59,12 @@ function create_fake_uname_script()
 
     # Print the script to file and add executable permission
     message[1]="    FAKE_KERNEL_RELEASE=${1}"
-    printf '%s' "${message[@]}" >> ${UNAME_PATH}
-    chmod 755 ${UNAME_PATH}
+    printf '%s' "${message[@]}" >> ${UNAME_PATH_FAKE}
+    chmod 755 ${UNAME_PATH_FAKE}
 
     # Echo success
     echo 'Success! uname will return faked kernel release: '${1}
+    echo "Run 'hash -d uname' to forget the command path remembered in hash table"
 }
 
 # Prompt message to select one version from the existing kernel headers
@@ -87,11 +85,10 @@ function select_kernel_ver()
 # Use default uname binary
 function reset_uname()
 {
-    if [[ -f "$UNAME_PATH_REAL" ]]; then
-        mv ${UNAME_PATH_REAL} ${UNAME_PATH}
-    fi
+    rm -rf ${UNAME_PATH_FAKE}
 
     echo 'Use original uname binary.'
+    echo "Run 'hash -d uname' to forget the command path remembered in hash table"
 }
 
 # Change uname output to designated version of kernel header
